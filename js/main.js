@@ -1,3 +1,75 @@
+let eventBus = new Vue()
+
+
+Vue.component('product-tabs', {
+    props: {
+        reviews: {
+            type: Array,
+            required: false
+        },
+        details:{
+            type: Array,
+            required: true
+        }
+    },
+    template: `
+     <div>   
+       <ul>
+         <span class="tab"
+               :class="{ activeTab: selectedTab === tab }"
+               v-for="(tab, index) in tabs"
+               @click="selectedTab = tab"
+               @mouseover="showCostShipping"
+         >{{ tab }}</span>
+       </ul>
+       <div v-show="selectedTab === 'Reviews'">
+         <p v-if="!reviews.length">There are no reviews yet.</p>
+         <ul>
+           <li v-for="review in reviews">
+           <p>{{ review.name }}</p>
+           <p>Rating: {{ review.rating }}</p>
+           <p>{{ review.review }}</p>
+           <p v-if="review.recomend == 1">Рекомендую</p>
+           <p v-else-if="review.recomend == 0 ">Не рекомендую</p>
+           </li>
+         </ul>
+       </div>
+       <div v-show="selectedTab === 'Make a Review'">
+            <product-review></product-review>
+       </div>
+       <div v-show="selectedTab === 'Shipping'" >
+            <p>Стоймость доставки:  {{ shippingCost }}</p>
+       </div>
+       <div v-show="selectedTab === 'Details'" >
+            <ul v-for="det in details">
+                <li >{{ det }}</li>
+            </ul>
+       </div>
+     </div>
+    `,
+
+
+    data() {
+        return {
+            tabs: ['Reviews', 'Make a Review', 'Shipping', 'Details'],
+            selectedTab: 'Reviews',  // устанавливается с помощью @click
+            shippingCost : 222,
+        }
+    },
+    methods:{
+        showCostShipping(){
+            eventBus.$emit('custom');
+        }
+    },
+    mounted(){
+        eventBus.$on('result-shipping', function(shippingCost){
+            this.shippingCost=shippingCost;
+        }.bind(this))
+    }
+})
+
+
+
 Vue.component('product-review', {
     template: `
         <form class="review-form" @submit.prevent="onSubmit">
@@ -60,7 +132,7 @@ Vue.component('product-review', {
                     rating: this.rating,
                     recomend: this.recomend,
                 }
-                this.$emit('review-submitted', productReview)
+                eventBus.$emit('review-submitted', productReview)
                 console.log(productReview);
                 this.name = null
                 this.review = null
@@ -103,6 +175,7 @@ Vue.component('product', {
    
           <div class="product-info">
               <h1>{{ title }}</h1>
+              <p>{{ description }}</p>
               <div class="sale-box">
                   <div v-if="sale" :class="{red_text: sale}">Sale!</div>
                   <div v-else></div>
@@ -110,9 +183,7 @@ Vue.component('product', {
               
               <p v-if="inStock">In stock</p>
               <p v-else>Out of Stock</p>
-              <ul>
-                  <li v-for="detail in details">{{ detail }}</li>
-              </ul>
+
 
               <p>User is premium: {{ premium }}</p>
               <p>Shipping: {{ shipping }}</p>
@@ -141,24 +212,8 @@ Vue.component('product', {
                 </button>
           </div>
 
-          <div>
-                <h2>Reviews</h2>
+          <product-tabs :reviews="reviews" :details="details" ></product-tabs>
 
-
-                <p v-if="!reviews.length">There are no reviews yet.</p>
-                <ul>
-                <li v-for="review in reviews">
-                <p>{{ review.name }}</p>
-                <p>Rating: {{ review.rating }}</p>
-                <p>{{ review.review }}</p>
-                <p v-if="review.recomend == 1">Рекомендую</p>
-                <p v-else-if="review.recomend == 0 ">Не рекомендую</p>
-                </li>
-                </ul>
-            </div>
-
-          
-          <product-review @review-submitted="addReview"></product-review>
       </div>
     `,
     data() {
@@ -167,6 +222,7 @@ Vue.component('product', {
             brand: 'Vue Mastery',
             selectedVariant: 0,
             altText: "A pair of socks",
+            description:  " A pair of warm, fuzzy socks",
             variants: [
                 {
                     variantId: 2234,
@@ -199,10 +255,22 @@ Vue.component('product', {
             this.selectedVariant = index;
             console.log(index);
         },
-        addReview(productReview) {
-            this.reviews.push(productReview)
+        shipping2() {
+            if (this.premium) {
+                return "Free";
+            } else {
+                return 2.99
+            }
         }
-
+    },
+    mounted() {
+        eventBus.$on('review-submitted', productReview => {
+            this.reviews.push(productReview)
+        }),
+            eventBus.$on('custom', () => {
+                let shippingCost = this.shipping2();
+                eventBus.$emit('result-shipping', shippingCost);
+            });
     },
     computed: {
         title() {
